@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src = 'js/jquery.min.js'></script>
+    <script type="text/javascript" src = 'js/bootstrap.min.js'></script>
+    <script type="text/javascript" src = 'js/angular.js'></script>
+    <script type="text/javascript" src = "js/ThreeJS/three.min.js"></script>
+    <script type="text/javascript" src = "js/ThreeJS/OrbitControls.js"></script>
+    <script type="text/javascript" src = "js/ThreeJS/MTLLoader.js"></script>
+    <script type="text/javascript" src = "js/ThreeJS/OBJMTLLoader.js"></script>
+    <script type="text/javascript" src = "js/ThreeJS/TransformControls.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/bootstrap-theme.min.css">
+
+    <style type="text/css">
+        #main {
+            width: 99%;
+            height: 99%;
+            position: absolute;
+            display: inline-block;
+            top: 0;
+            background: black;
+        }
+        #sidebar {
+            width: 20%;
+            height: 100%;
+            display: inline-block;
+            float: left;
+            align-content: center;
+            background: black
+        }
+
+        #viewport {
+            width: 80%;
+            height: 100%;
+            float: left;
+        }
+
+        #container {
+            width: 100%;
+            height: 90%;
+            border-width: ;
+            border: 1px solid yellow;
+        }
+        #time {
+            padding-top: 2.5%;
+            height: 5%;
+            width: 10%;
+            float: left;
+            text-align: center;
+            color: white
+        }
+        #timeline {
+            height: 10%;
+            width: 90%;
+        }
+        .stretch {
+            width: 95%;
+        }
+
+    </style>
+</head>
+
+<body bgcolor='black'>
+    <div id = 'main'>
+         <div id = 'sidebar'>
+            <button type="button" name="Test Button" class="btn btn-success stretch" onClick="onStartClicked()"> Start </button>
+            <button type="button" name="Test Button" class="btn btn-primary stretch" onClick="onStopClicked()"> Stop </button>
+            <hr>
+            <button type="button" name="Test Button" class="btn btn-danger stretch" onClick="onOrbitClicked()"> Orbit </button>
+            <button type="button" name="Test Button" class="btn btn-success stretch" onClick="onTranslateClicked()"> Translate </button>
+            <button type="button" name="Test Button" class="btn btn-primary stretch" onClick="onRotateClicked()"> Rotate </button>
+            <button type="button" name="Test Button" class="btn btn-warning stretch" onClick="onScaleClicked()"> Scale </button>
+        </div>
+
+        <div id = "viewport">
+            <label id = "time" value="Test">0</label>
+            <input type="range" id = "timeline" min = '0', max = '100' step = '1' value = '0' oninput="changeVal(this.value)" onchange="changeVal(this.value)"> 
+            <div id = 'container'>
+            </div>
+        </div>
+        
+    </div>
+</body>
+
+<script type="text/javascript">
+    var container;
+    var timeline;
+    var scene;
+    var renderer;
+    var camera;
+    var transformControls;
+    var orbitControls;
+    var mNearPlane = 0.1;
+    var mFarPlane = 10000;
+    var mViewAngle = 45;
+    var cube;
+    var currentObject = undefined;
+    var boundingBoxHelper = undefined;
+    var mCount = 0;
+    var mSpeed = 10;
+    var MaxFrameCount = 100;
+    var leftIndex = undefined;
+    var rightIndex = undefined;
+    var rigMesh = undefined;
+    var lastState = undefined;
+
+    var mValues = {};
+
+    var ANIMATE = 0;
+    var STOP = 0;
+    var PLAY = 1;
+    var mode = STOP;
+
+    function onStopClicked() {
+        mode = STOP;
+    }
+
+    function onStartClicked() {
+        mCount = timeline.val() * mSpeed;
+        mode = PLAY;
+    }
+    function changeVal(value) {
+        updatePosition(value);
+        $('#time').text(value);
+    }
+    function onOrbitClicked() {
+        transformControls.enabled = false;
+        transformControls.visible = false;
+        orbitControls.enabled = true;
+    }
+    function onRotateClicked() {
+        transformControls.enabled = true;
+        transformControls.visible = true;
+        orbitControls.enabled = false;
+        transformControls.setMode('rotate');
+    }
+    function onTranslateClicked() {
+        transformControls.enabled = true;
+        transformControls.visible = true;
+        orbitControls.enabled = false;
+        transformControls.setMode('translate');
+    }
+    function onScaleClicked() {
+        transformControls.enabled = true;
+        orbitControls.enabled = false;
+        transformControls.visible = true;
+        transformControls.setMode('scale');
+    }
+    function updatePosition(curFrame) {
+        keyFrameList = Object.keys(mValues);
+        lefIndex = undefined
+        rightIndex = 0
+        if (keyFrameList.length == 0)
+            return;
+
+        for (frame in keyFrameList) {
+            if (Number(curFrame) > Number(keyFrameList[frame])) {
+                rightIndex++;
+            }
+        }
+
+        if (rightIndex == 0) {
+            leftIndex = undefined;
+            rightPosition = mValues[keyFrameList[rightIndex]].position;
+            rightRotation = mValues[keyFrameList[rightIndex]].rotation;
+            rightScale = mValues[keyFrameList[rightIndex]].scale;
+            
+            cube.position.set(rightPosition.x, rightPosition.y, rightPosition.z);
+            cube.rotation.set(rightRotation.x, rightRotation.y, rightRotation.z);
+            cube.scale.set(rightScale.x, rightScale.y, rightScale.z);
+        } else if (rightIndex == keyFrameList.length) {
+            leftIndex = rightIndex - 1;
+            rightIndex = undefined;
+            leftPosition = mValues[keyFrameList[leftIndex]].position;
+            leftRotation = mValues[keyFrameList[leftIndex]].rotation;
+            leftScale = mValues[keyFrameList[leftIndex]].scale;
+            
+            cube.position.set(leftPosition.x, leftPosition.y, leftPosition.z);
+            cube.rotation.set(leftRotation.x, leftRotation.y, leftRotation.z);
+            cube.scale.set(leftScale.x, leftScale.y, leftScale.z);
+
+          } else {
+            leftIndex = rightIndex - 1;
+            m = (curFrame - keyFrameList[leftIndex]) / (keyFrameList[rightIndex] - keyFrameList[leftIndex]);
+            leftPosition = mValues[keyFrameList[leftIndex]].position;
+            leftRotation = mValues[keyFrameList[leftIndex]].rotation;
+            leftScale = mValues[keyFrameList[leftIndex]].scale;
+
+            rightPosition = mValues[keyFrameList[rightIndex]].position;
+            rightRotation = mValues[keyFrameList[rightIndex]].rotation;
+            rightScale = mValues[keyFrameList[rightIndex]].scale;
+
+            cube.position.set(leftPosition.x  + m * (rightPosition.x - leftPosition.x),
+                                leftPosition.y  + m * (rightPosition.y - leftPosition.y),
+                                leftPosition.z  + m * (rightPosition.z - leftPosition.z) )
+            cube.rotation.set(leftRotation.x  + m * (rightRotation.x - leftRotation.x),
+                                leftRotation.y  + m * (rightRotation.y - leftRotation.y),
+                                leftRotation.z  + m * (rightRotation.z - leftRotation.z) )
+            cube.scale.set(leftScale.x  + m * (rightScale.x - leftScale.x),
+                                leftScale.y  + m * (rightScale.y - leftScale.y),
+                                leftScale.z  + m * (rightScale.z - leftScale.z) )
+        }
+    }
+    function addViewport() {
+        // Initial setup of scene
+        container = $('#container');
+        timeline = $('#timeline');
+        scene = new THREE.Scene();
+        renderer = new THREE.WebGLRenderer();
+
+        renderer.setSize(container.width(), container.height());
+        container.append(renderer.domElement);
+    }
+
+    function addCamera() {
+        camera = new THREE.PerspectiveCamera(mViewAngle, container.width() / container.height(), mNearPlane, mFarPlane);
+        camera.position.set(20, 20, 20);
+        camera.lookAt(scene.position);
+        scene.add(camera);
+        orbitControls = new THREE.OrbitControls( camera, renderer.domElement );
+
+        transformControls = new THREE.TransformControls(camera, renderer.domElement);
+        transformControls.setTranslationSnap(0.1);
+        transformControls.setRotationSnap(THREE.Math.degToRad(1));
+        transformControls.addEventListener('change', onTransformChange);
+        scene.add(transformControls);
+        transformControls.visible = false;
+    }
+
+    function onTransformChange() {
+        if (currentObject == undefined)
+            return;
+
+        if (lastState != undefined && 
+            (lastState.position.x != currentObject.position.x ||
+            lastState.position.y != currentObject.position.y ||
+            lastState.position.z != currentObject.position.z ||
+
+            lastState.rotation.x != currentObject.rotation.x ||
+            lastState.rotation.y != currentObject.rotation.y ||
+            lastState.rotation.z != currentObject.rotation.z ||
+            
+            lastState.scale.x != currentObject.scale.x ||
+            lastState.scale.y != currentObject.scale.y ||
+            lastState.scale.z != currentObject.scale.z)) {
+            mValues[timeline.val()] = {
+                position: {
+                    x: currentObject.position.x,
+                    y: currentObject.position.y,
+                    z: currentObject.position.z
+                },
+                rotation: {
+                    x: currentObject.rotation.x,
+                    y: currentObject.rotation.y,
+                    z: currentObject.rotation.z
+                },
+                scale:  {
+                    x: currentObject.scale.x,
+                    y: currentObject.scale.y,
+                    z: currentObject.scale.z
+                }
+            }
+        }
+
+        lastState = {
+            'currentObject': currentObject,
+            position: {
+                x: currentObject.position.x,
+                y: currentObject.position.y,
+                z: currentObject.position.z
+            },
+            rotation: {
+                x: currentObject.rotation.x,
+                y: currentObject.rotation.y,
+                z: currentObject.rotation.z
+            },
+            scale:  {
+                x: currentObject.scale.x,
+                y: currentObject.scale.y,
+                z: currentObject.scale.z
+            }
+        }
+        render();
+    }
+
+    function addDefaultLights() {
+        // Add default lights
+        var light = new THREE.PointLight(0xff0000);
+        light.position.set(0,1000,0);
+        scene.add(light);
+
+        light = new THREE.PointLight(0x00ff00);
+        light.position.set(0,0,1000);
+        scene.add(light);
+
+        light = new THREE.PointLight(0x0000ff);
+        light.position.set(1000,0,0);
+        scene.add(light);
+
+        var ambientLight = new THREE.AmbientLight(0xffffff);
+        scene.add(ambientLight);
+    }
+
+    function initEventListeners() {
+        window.addEventListener('resize', function() {
+            // May need to adjust the camera/projection matrices
+            renderer.setSize( container.width(), container.height());
+            camera.aspect   = container.width() / container.height();
+            camera.updateProjectionMatrix();
+        }, false);
+
+        window.addEventListener('keydown', function(event) {
+            keyCode = event.keyCode || event.which;
+            switch(keyCode) {
+                case 17: {
+                    // Ctrl
+                    transformControls.setTranslationSnap( 5 );
+                    transformControls.setRotationSnap( THREE.Math.degToRad( 15 ) );
+                }
+                case 87: {
+                    // W
+                    onTranslateClicked();
+                    break;
+                }
+                case 69: {
+                    // E
+                    onRotateClicked();
+                    break;
+                }
+                case 82: {
+                    //R
+                    onScaleClicked();
+                    break;
+                }
+                default:
+            }
+        });
+
+        window.addEventListener('keyup', function(event) {
+            var keyCode = event.keyCode || event.which;
+            switch(keyCode) {
+            case 17: // Ctrl
+                transformControls.setTranslationSnap(0.1);
+                transformControls.setRotationSnap( THREE.Math.degToRad(1) );
+                break;
+            }
+        });
+
+        container.on('mousedown', function(event) {
+            container.focus();
+            container.trigger('clearSelection');
+            
+            mouse = new THREE.Vector2((event.offsetX / container.width()) * 2 - 1, -((event.offsetY / container.height()) * 2 - 1));
+            raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            assetList = [];
+            assetList.push(cube);
+
+            var intersects = raycaster.intersectObjects(assetList, true);
+            if (intersects.length > 0) {
+                object = intersects[0].object;
+                if (object != currentObject) {
+                    container.trigger('selectionChanged', [object]);
+                }
+            }
+        });
+
+        container.on('selectionChanged', function(event, asset) {
+            currentObject = asset;
+            transformVisibility = transformControls.visible;
+            transformControls.attach(currentObject);
+            transformControls.visible = transformVisibility;
+
+            boundingBoxHelper = new THREE.BoundingBoxHelper( currentObject, 0xff0000 );
+            boundingBoxHelper.update();
+            boxHelper = new THREE.BoxHelper(boundingBoxHelper);
+            scene.add(boxHelper);
+        });
+
+        container.on('clearSelection', function(event) {
+            if (currentObject != undefined) {
+                transformControls.detach(currentObject);
+                currentObject = undefined;
+                scene.remove(boxHelper);
+                boundingBoxHelper = undefined;
+                $('#attributeEditor').trigger('setSelection', [currentObject]);
+            }
+        });
+    }
+
+    function initScene() {
+        var geometry = new THREE.PlaneGeometry( 50, 50, 20, 20 );
+        var material = new THREE.MeshPhongMaterial({color: 0x156289, side: THREE.DoubleSide});
+        var plane = new THREE.Mesh( geometry, material );
+        plane.rotation.x = Math.PI / 2;
+        scene.add( plane );
+
+        // Create an array of materials to be used in a cube, one for each side
+        var cubeMaterialArray = [];
+        // order to add materials: x+,x-,y+,y-,z+,z-
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0xff3333 } ) );
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0xff8800 } ) );
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0xffff33 } ) );
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x33ff33 } ) );
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x3333ff } ) );
+        cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x8833ff } ) );
+        var cubeMaterials = new THREE.MeshFaceMaterial( cubeMaterialArray );
+        var cubeGeometry = new THREE.CubeGeometry( 10, 10, 10 );
+        cube = new THREE.Mesh( cubeGeometry, cubeMaterials );
+        cube.position.set(0, 5, 0);
+        scene.add( cube );
+
+        var loader = new THREE.JSONLoader();
+        var animation;
+
+        // load the model and create everything
+        loader.load('js/JsonSkinnedMesh.js', function (geometry, materials) {
+            var mesh, material;
+
+            // create a mesh
+            mesh = new THREE.SkinnedMesh(
+                geometry,
+                new THREE.MeshFaceMaterial(materials)
+            );
+
+            // define materials collection
+            material = mesh.material.materials;
+
+            // enable skinning
+            for (var i = 0; i < materials.length; i++) {
+            var mat = materials[i];
+
+            mat.skinning = true;
+            }
+
+            scene.add(mesh);
+            rigMesh = mesh;
+        });
+    }
+
+    function animate() {
+        requestAnimationFrame( animate );
+        render();
+        update();
+    }
+
+    function render() {
+        renderer.render(scene, camera);
+    }
+
+    function update() {
+        orbitControls.update();
+        transformControls.update();
+
+        if (boundingBoxHelper != undefined) {
+            boundingBoxHelper.update();
+            boxHelper.update(boundingBoxHelper);
+        }
+
+        if (rigMesh != undefined) {
+            rigMesh.skeleton.bones[2].rotateY (0.01);
+            rigMesh.skeleton.bones[1].rotateZ (0.01);
+        }
+        
+        if (mode == PLAY) {
+            mCount++;
+            keyFrameList = Object.keys(mValues);
+            frameNo = (mCount / mSpeed) % MaxFrameCount;
+            timeline.val(frameNo);
+            $('#time').text(timeline.val());
+            updatePosition(frameNo);
+        }
+    }
+
+    function initViewport() {
+        addViewport();
+        initEventListeners();
+        addCamera();
+        addDefaultLights();
+        initScene();
+        animate();
+    }
+
+    initViewport();
+</script>
+
+</html>
